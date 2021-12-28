@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum Instruction {
-    DupPlusSP(i32),
-    MoveMinusSP(usize, i32),
-    MovePlusSP(usize),
+    DupPlusFP(i32),
+    MoveMinusFP(usize, i32),
+    MovePlusFP(usize),
     Store(i32),
     Return,
     JumpIfNotZero(String),
@@ -85,7 +85,7 @@ fn compile_literal(
         }
         Literal::Identifier(ident) => {
             pgrm.instructions
-                .push(Instruction::DupPlusSP(locals[&ident.value]));
+                .push(Instruction::DupPlusFP(locals[&ident.value]));
         }
     }
 }
@@ -125,7 +125,7 @@ fn compile_declaration(
     let function_index = pgrm.instructions.len() as i32;
     let narguments = fd.parameters.len();
     for (i, param) in fd.parameters.iter().enumerate() {
-        pgrm.instructions.push(Instruction::MoveMinusSP(
+        pgrm.instructions.push(Instruction::MoveMinusFP(
             i,
             narguments as i32 - (i as i32 + 1),
         ));
@@ -193,7 +193,7 @@ fn compile_local(
     let index = locals.keys().len();
     locals.insert(local.name.value, index as i32);
     compile_expression(pgrm, raw, locals, local.expression);
-    pgrm.instructions.push(Instruction::MovePlusSP(index));
+    pgrm.instructions.push(Instruction::MovePlusFP(index));
 }
 
 fn compile_statement(
@@ -226,22 +226,22 @@ pub fn compile(raw: &Vec<char>, ast: AST) -> Program {
 
 pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
-    let mut sp: i32 = 0;
+    let mut fp: i32 = 0;
     let mut data: Vec<i32> = vec![];
 
     while pc < pgrm.instructions.len() as i32 {
         match &pgrm.instructions[pc as usize] {
-            Instruction::DupPlusSP(i) => {
-                data.push(data[(sp + i) as usize]);
+            Instruction::DupPlusFP(i) => {
+                data.push(data[(fp + i) as usize]);
                 pc += 1;
             }
-            Instruction::MoveMinusSP(local_offset, sp_offset) => {
-                data[sp as usize + local_offset] = data[(sp - (sp_offset + 4)) as usize];
+            Instruction::MoveMinusFP(local_offset, fp_offset) => {
+                data[fp as usize + local_offset] = data[(fp - (fp_offset + 4)) as usize];
                 pc += 1;
             }
-            Instruction::MovePlusSP(i) => {
+            Instruction::MovePlusFP(i) => {
                 let val = data.pop().unwrap();
-                let index = sp as usize + *i;
+                let index = fp as usize + *i;
                 // Accounts for top-level locals
                 while index >= data.len() {
                     data.push(0);
@@ -263,14 +263,14 @@ pub fn eval(pgrm: Program) {
                 let ret = data.pop().unwrap();
 
                 // Clean up the local stack
-                while sp < data.len() as i32 {
+                while fp < data.len() as i32 {
                     data.pop();
                 }
 
-                // Restore pc and sp
+                // Restore pc and fp
                 let mut narguments = data.pop().unwrap();
                 pc = data.pop().unwrap();
-                sp = data.pop().unwrap();
+                fp = data.pop().unwrap();
 
                 // Clean up arguments
                 while narguments > 0 {
@@ -293,11 +293,11 @@ pub fn eval(pgrm: Program) {
                     continue;
                 }
 
-                data.push(sp);
+                data.push(fp);
                 data.push(pc + 1);
                 data.push(pgrm.syms[label].narguments as i32);
                 pc = pgrm.syms[label].location;
-                sp = data.len() as i32;
+                fp = data.len() as i32;
 
                 // Set up space for all arguments/locals
                 let mut nlocals = pgrm.syms[label].nlocals;
