@@ -8,7 +8,7 @@ enum Instruction {
     MovePlusSP(usize),
     Store(i32),
     Return,
-    JumpIfZero(String),
+    JumpIfNotZero(String),
     Jump(String),
     Call(String, usize),
     Add,
@@ -153,7 +153,7 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, 
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!("if_else_{}", pgrm.instructions.len());
     pgrm.instructions
-        .push(Instruction::JumpIfZero(done_label.clone()));
+        .push(Instruction::JumpIfNotZero(done_label.clone()));
     for stmt in if_.body {
         compile_statement(pgrm, raw, locals, stmt);
     }
@@ -205,21 +205,19 @@ pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
     let mut sp: i32 = 0;
     let mut data: Vec<i32> = vec![];
-
-    println!("{:#?}", pgrm.instructions);
+    //println!("{:#?}", pgrm.instructions);
 
     while pc < pgrm.instructions.len() as i32 {
-        println!(
-            "DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n",
-            pc, sp, pgrm.instructions[pc as usize], data
-        );
-        let mut input = String::new();
+        //println!(
+        //    "DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n",
+        //    pc, sp, pgrm.instructions[pc as usize], data
+        //);
         match &pgrm.instructions[pc as usize] {
             Instruction::DupPlusSP(i) => {
                 data.push(data[(sp + i) as usize]);
                 pc += 1;
             }
-            Instruction::MoveMinusSP(local_offset, sp_offset) => {
+	    Instruction::MoveMinusSP(local_offset, sp_offset) => {
                 data[sp as usize + local_offset] = data[(sp - (sp_offset + 3)) as usize];
                 pc += 1;
             }
@@ -233,9 +231,9 @@ pub fn eval(pgrm: Program) {
                 data[index] = val;
                 pc += 1;
             }
-            Instruction::JumpIfZero(label) => {
+            Instruction::JumpIfNotZero(label) => {
                 let top = data.pop().unwrap();
-                if top != 0 {
+                if top == 0 {
                     pc = pgrm.syms[label].0;
                 }
                 pc += 1;
@@ -284,20 +282,20 @@ pub fn eval(pgrm: Program) {
                 }
             }
             Instruction::Add => {
-                let left = data.pop().unwrap();
                 let right = data.pop().unwrap();
+                let left = data.pop().unwrap();
                 data.push(left + right);
                 pc += 1;
             }
             Instruction::Subtract => {
-                let left = data.pop().unwrap();
                 let right = data.pop().unwrap();
-                data.push(right - left);
+                let left = data.pop().unwrap();
+                data.push(left - right);
                 pc += 1;
             }
             Instruction::LessThan => {
-                let left = data.pop().unwrap();
                 let right = data.pop().unwrap();
+                let left = data.pop().unwrap();
                 data.push(if left < right { 1 } else { 0 });
                 pc += 1;
             }
