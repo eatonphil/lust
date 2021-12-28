@@ -55,7 +55,7 @@ struct Token {
     loc: Location,
 }
 
-fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Tag, Location)> {
+fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = [
     	";",
 	"=",
@@ -71,14 +71,14 @@ fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Tag, Location)>
 	let next_loc = initial_loc.increment(false);
 	// TODO: this won't work with multiple-character syntax bits like >= or ==
 	if possible_syntax == c.to_string() {
-	    return Some((Token{ value: possible_syntax, loc: initial_loc, kind: TokenKind::Syntax }, next_loc));
+	    return Some((Token{ value: possible_syntax.to_string(), loc: initial_loc, kind: TokenKind::Syntax }, next_loc));
 	}
     }
 
     None
 }
 
-fn lex_keywords(raw: &Vec<char>, initial_loc: Location) -> Option<(Tag, Location)> {
+fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = [
 	"function",
 	"end",
@@ -110,7 +110,7 @@ fn lex_keywords(raw: &Vec<char>, initial_loc: Location) -> Option<(Tag, Location
     // this is not a keyword.
     if next_loc.index < raw.len() - 2 {
 	let next_c = raw[next_loc.index+1];
-	if next_c.is_alphanumeric() || c == '_' {
+	if next_c.is_alphanumeric() || next_c == '_' {
 	    return None;
 	}
     }
@@ -129,7 +129,7 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
     }
 
     // First character must not be a digit
-    if ident.len() > 0 && !ident.nth(0).is_digit() {
+    if ident.len() > 0 && !ident.chars().nth(0).unwrap().is_digit(10) {
 	Some((Token{ value: ident, loc: initial_loc, kind: TokenKind::Identifier }, next_loc))
     } else {
 	None
@@ -140,7 +140,7 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
     let mut ident = String::new();
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
-    while c.is_digit() {
+    while c.is_digit(10) {
 	next_loc = next_loc.increment(false);
 	ident.push_str(&c.to_string());
 	c = raw[next_loc.index];
@@ -165,7 +165,7 @@ fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
     next_loc
 }
 
-fn lex<S: Into<String>>(s: S) -> Result<Vec<Token>, String> {
+pub fn lex<S: Into<String>>(s: S) -> Result<Vec<Token>, String> {
     let mut loc = Location{col: 0, index: 0, line: 0};
     let s_string = s.into();
     let size = s_string.len();

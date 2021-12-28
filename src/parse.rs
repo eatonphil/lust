@@ -339,7 +339,7 @@ fn parse_statement(raw: &Vec<char>, tokens: Vec<Token>, index: i32) -> Option<(S
     None
 }
 
-fn parse(raw: &Vec<char>, tokens: Vec<Token>) -> Result<AST, String> {
+pub fn parse(raw: &Vec<char>, tokens: Vec<Token>) -> Result<AST, String> {
     let AST = AST{};
     let mut index = 0;
     'outer: while index < tokens.len() {

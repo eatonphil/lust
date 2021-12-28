@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 enum Instruction {
     DupMinusSP(i32),
     DupPlusSP(i32),
@@ -12,11 +14,11 @@ enum Instruction {
 }
 
 struct Program {
-    syms: &HashTable<String, usize>;
-    instructions: &Vec<Instruction>;
+    syms: &mut HashTable<String, usize>,
+    instructions: &mut Vec<Instruction>,
 }
 
-fn compile_binary_operation(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, bop: BinaryOperation) {
+fn compile_binary_operation(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, bop: BinaryOperation) {
     compile_expression(prgrm, raw, locals, bop.left);
     compile_expression(prgrm, raw, locals, bop.right);
     match bop.op {
@@ -27,7 +29,7 @@ fn compile_binary_operation(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMa
     }
 }
 
-fn compile_function_call(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, fc: FunctionCall) {
+fn compile_function_call(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, fc: FunctionCall) {
     for arg in fc.args {
 	compile_expression(pgrm, raw, locals, arg);
     }
@@ -35,14 +37,14 @@ fn compile_function_call(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<S
     pgrm.instructions.push(Instruction::Call(fc.name));
 }
 
-fn compile_literal(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, lit: Literal) {
+fn compile_literal(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, lit: Literal) {
     match lit {
 	Literal::Number(i) => pgrm.instructions.push(Instruction::Store(i));
 	Literal::Identifier(ident) => pgrm.instructions.push(Instruction::DupPlusSP(locals[ident]));
     }
 }
 
-fn compile_expression(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, exp: Expression) {
+fn compile_expression(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, exp: Expression) {
     match exp {
 	Expression::BinaryOperation(bop) => compile_binary_operation(pgrm, raw, locals, exp),
 	Expression::FunctionCall(fc) => compile_function_call(pgrm, raw, locals, fc),
@@ -50,7 +52,7 @@ fn compile_expression(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<Stri
     }
 }
 
-fn compile_declaration(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, fd: FunctionDeclaration) {
+fn compile_declaration(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, fd: FunctionDeclaration) {
     // Jump to end of function to guard top-level
     let done_label = format!("function_done_{}", pgrm.instructions.len());
     pgrm.instructions.push(Instruction::Jump(done_label));
@@ -68,11 +70,11 @@ fn compile_declaration(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<Str
     pgrm.syms[done_label] = pgrm.instructions.len();
 }
 
-fn compile_return(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, ret: Return) {
+fn compile_return(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, ret: Return) {
     pgrm.instructions.push(Instruction::Return);
 }
 
-fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, if_: If) {
+fn compile_if(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, if_: If) {
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!("if_else_{}", pgrm.instructions.len());
     pgrm.instructions.push(Instruction::JumpIfZero(done_label));
@@ -82,12 +84,12 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usiz
     pgrm.syms[done_label] = prgrm.instructions.len();
 }
 
-fn compile_local(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, local: Local) {
+fn compile_local(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, local: Local) {
     locals[local.name] = prgm.instructions.len();
     compile_expression(pgrm, raw, locals, local.expression);
 }
 
-fn compile_statement(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<String, usize>, stmt: Statement) {
+fn compile_statement(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, usize>, stmt: Statement) {
     match stmt.kind {
 	Statement::FunctionDeclaration(fd) => compile_declaration(pgrm, raw, locals, fd),
 	Statement::Return(r) => compile_return(pgrm, raw, locals, r),
@@ -97,7 +99,8 @@ fn compile_statement(pgrm: &mut Program, raw: &Vec<char>, locals: &HashMap<Strin
     }
 }
 
-fn compile(raw: &Vec<char>, locals: &HashMap<String, usize>, pgrm: AST) Vec<Instruction> {
+pub fn compile(raw: &Vec<char>,  pgrm: AST) -> Program {
+    let locals &HashMap<String, usize> = HashMap::new();
     let mut pgrm = Program{};
     for stmt in pgrm {
 	compile_statement(&pgrm, raw, locals, stmt);
@@ -106,16 +109,16 @@ fn compile(raw: &Vec<char>, locals: &HashMap<String, usize>, pgrm: AST) Vec<Inst
     pgrm
 }
 
-fn eval(pgrm: AST) {
-    let mut pc = 0;
-    let mut sp = 0;
+pub fn eval(pgrm: Program) {
+    let mut pc: i32 = 0;
+    let mut sp: i32 = 0;
     let mut calls: Vec<i32> = vec![];
     let mut data: Vec<i32> = vec![];
 
     while pc < pgrm.instructions.len() {
 	match pgrm.instructions[pc] {
-	    DupMinusSP(i) => data.push(data[sp - i as usize]),
-	    DupPlusSP(i) => data.push(data[sp + i as usize]),
+	    DupMinusSP(i) => data.push(data[(sp - i) as usize]),
+	    DupPlusSP(i) => data.push(data[(sp + i) as usize]),
 	    Return => {
 		pc = calls.pop().unwrap();
 		sp = pc;
