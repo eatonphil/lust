@@ -17,8 +17,15 @@ enum Instruction {
 }
 
 #[derive(Debug)]
+struct Symbol {
+    location: i32,
+    narguments: usize,
+    nlocals: usize,
+}
+
+#[derive(Debug)]
 pub struct Program {
-    syms: HashMap<String, (i32, usize)>,
+    syms: HashMap<String, Symbol>,
     instructions: Vec<Instruction>,
 }
 
@@ -116,11 +123,19 @@ fn compile_declaration(
     let mut new_locals = HashMap::<String, i32>::new();
 
     let function_index = pgrm.instructions.len() as i32;
-    pgrm.syms.insert(fd.name.value.clone(), (function_index, 0));
+    let narguments = fd.parameters.len();
+    pgrm.syms.insert(
+        fd.name.value.clone(),
+        Symbol {
+            location: function_index,
+            narguments: 0,
+            nlocals: 0,
+        },
+    );
     for (i, param) in fd.parameters.iter().enumerate() {
         pgrm.instructions.push(Instruction::MoveMinusSP(
             i,
-            fd.parameters.len() as i32 - (i as i32 + 1),
+            narguments as i32 - (i as i32 + 1),
         ));
         new_locals.insert(param.value.clone(), i as i32);
     }
@@ -132,11 +147,21 @@ fn compile_declaration(
     // Overwrite function lookup with total number of locals
     pgrm.syms.insert(
         fd.name.value,
-        (function_index as i32, new_locals.keys().len()),
+        Symbol {
+            location: function_index as i32,
+            narguments: narguments,
+            nlocals: new_locals.keys().len(),
+        },
     );
 
-    pgrm.syms
-        .insert(done_label, (pgrm.instructions.len() as i32, 0));
+    pgrm.syms.insert(
+        done_label,
+        Symbol {
+            location: pgrm.instructions.len() as i32,
+            narguments: 0,
+            nlocals: 0,
+        },
+    );
 }
 
 fn compile_return(
@@ -157,8 +182,14 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, 
     for stmt in if_.body {
         compile_statement(pgrm, raw, locals, stmt);
     }
-    pgrm.syms
-        .insert(done_label, (pgrm.instructions.len() as i32 - 1, 0));
+    pgrm.syms.insert(
+        done_label,
+        Symbol {
+            location: pgrm.instructions.len() as i32 - 1,
+            nlocals: 0,
+            narguments: 0,
+        },
+    );
 }
 
 fn compile_local(
@@ -205,20 +236,15 @@ pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
     let mut sp: i32 = 0;
     let mut data: Vec<i32> = vec![];
-    //println!("{:#?}", pgrm.instructions);
 
     while pc < pgrm.instructions.len() as i32 {
-        //println!(
-        //    "DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n",
-        //    pc, sp, pgrm.instructions[pc as usize], data
-        //);
         match &pgrm.instructions[pc as usize] {
             Instruction::DupPlusSP(i) => {
                 data.push(data[(sp + i) as usize]);
                 pc += 1;
             }
-	    Instruction::MoveMinusSP(local_offset, sp_offset) => {
-                data[sp as usize + local_offset] = data[(sp - (sp_offset + 3)) as usize];
+            Instruction::MoveMinusSP(local_offset, sp_offset) => {
+                data[sp as usize + local_offset] = data[(sp - (sp_offset + 4)) as usize];
                 pc += 1;
             }
             Instruction::MovePlusSP(i) => {
@@ -234,29 +260,33 @@ pub fn eval(pgrm: Program) {
             Instruction::JumpIfNotZero(label) => {
                 let top = data.pop().unwrap();
                 if top == 0 {
-                    pc = pgrm.syms[label].0;
+                    pc = pgrm.syms[label].location;
                 }
                 pc += 1;
             }
             Instruction::Jump(label) => {
-                pc = pgrm.syms[label].0;
+                pc = pgrm.syms[label].location;
             }
             Instruction::Return => {
                 let ret = data.pop().unwrap();
-                let mut nlocals = 0;
+
+                // Clean up the local stack
                 while sp < data.len() as i32 {
-                    // Clean up the local stack
-                    nlocals += 1;
                     data.pop();
                 }
+
+                // Restore pc and sp
+                let mut narguments = data.pop().unwrap();
                 pc = data.pop().unwrap();
                 sp = data.pop().unwrap();
 
                 // Clean up arguments
-                while nlocals > 0 {
+                while narguments > 0 {
                     data.pop();
-                    nlocals -= 1;
+                    narguments -= 1;
                 }
+
+                // Add back return value
                 data.push(ret);
             }
             Instruction::Call(label, narguments) => {
@@ -273,9 +303,12 @@ pub fn eval(pgrm: Program) {
 
                 data.push(sp);
                 data.push(pc + 1);
-                pc = pgrm.syms[label].0;
-                let mut nlocals = pgrm.syms[label].1;
+                data.push(pgrm.syms[label].narguments as i32);
+                pc = pgrm.syms[label].location;
                 sp = data.len() as i32;
+
+                // Set up space for all arguments/locals
+                let mut nlocals = pgrm.syms[label].nlocals;
                 while nlocals > 0 {
                     data.push(0);
                     nlocals -= 1;

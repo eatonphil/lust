@@ -87,7 +87,7 @@ fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locati
 }
 
 fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
-    let syntax = [";", "=", "(", ")"];
+    let syntax = [";", "=", "(", ")", ","];
 
     for possible_syntax in syntax {
         let c = raw[initial_loc.index];

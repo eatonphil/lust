@@ -1,6 +1,6 @@
 function fib(n)
    if n < 2 then
-     return n;
+      return n;
    end
 
    local n1 = fib(n-1);
@@ -8,4 +8,4 @@ function fib(n)
    return n1 + n2;
 end
 
-print(fib(5));
+print(fib(40));
