@@ -3,8 +3,9 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 enum Instruction {
-    DupMinusSP(i32),
     DupPlusSP(i32),
+    MoveMinusSP(usize, i32),
+    MovePlusSP(usize),
     Store(i32),
     Return,
     JumpIfZero(String),
@@ -17,7 +18,7 @@ enum Instruction {
 
 #[derive(Debug)]
 pub struct Program {
-    syms: HashMap<String, i32>,
+    syms: HashMap<String, (i32, usize)>,
     instructions: Vec<Instruction>,
 }
 
@@ -74,22 +75,28 @@ fn compile_expression(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<
     }
 }
 
-fn compile_declaration(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, fd: FunctionDeclaration) {
+fn compile_declaration(pgrm: &mut Program, raw: &Vec<char>, _: &mut HashMap<String, i32>, fd: FunctionDeclaration) {
     // Jump to end of function to guard top-level
     let done_label = format!("function_done_{}", pgrm.instructions.len());
     pgrm.instructions.push(Instruction::Jump(done_label.clone()));
 
-    pgrm.syms.insert(fd.name.value, pgrm.instructions.len() as i32);
+    let mut new_locals = HashMap::<String, i32>::new();
+
+    let function_index = pgrm.instructions.len() as i32;
+    pgrm.syms.insert(fd.name.value.clone(), (function_index, 0));
     for (i, param) in fd.parameters.iter().enumerate() {
-	pgrm.instructions.push(Instruction::DupMinusSP(fd.parameters.len() as i32 - (i as i32 + 1)));
-	locals.insert(param.value.clone(), i as i32);
+	pgrm.instructions.push(Instruction::MoveMinusSP(i, fd.parameters.len() as i32 - (i as i32 + 1)));
+	new_locals.insert(param.value.clone(), i as i32);
     }
 
     for stmt in fd.body {
-	compile_statement(pgrm, raw, locals, stmt);
+	compile_statement(pgrm, raw, &mut new_locals, stmt);
     }
 
-    pgrm.syms.insert(done_label, pgrm.instructions.len() as i32);
+    // Overwrite function lookup with total number of locals
+    pgrm.syms.insert(fd.name.value, (function_index as i32, new_locals.keys().len()));
+
+    pgrm.syms.insert(done_label, (pgrm.instructions.len() as i32, 0));
 }
 
 fn compile_return(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, ret: Return) {
@@ -104,12 +111,14 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, 
     for stmt in if_.body {
 	compile_statement(pgrm, raw, locals, stmt);
     }
-    pgrm.syms.insert(done_label, pgrm.instructions.len() as i32);
+    pgrm.syms.insert(done_label, (pgrm.instructions.len() as i32 - 1, 0));
 }
 
 fn compile_local(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, local: Local) {
-    locals.insert(local.name.value, locals.keys().len() as i32);
+    let index = locals.keys().len();
+    locals.insert(local.name.value, index as i32);
     compile_expression(pgrm, raw, locals, local.expression);
+    pgrm.instructions.push(Instruction::MovePlusSP(index));
 }
 
 fn compile_statement(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, stmt: Statement) {
@@ -140,26 +149,38 @@ pub fn eval(pgrm: Program) {
     let mut sp: i32 = 0;
     let mut data: Vec<i32> = vec![];
 
+    println!("{:#?}", pgrm.instructions);
+
     while pc < pgrm.instructions.len() as i32 {
 	println!("DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n", pc, sp, pgrm.instructions[pc as usize], data);
 	match &pgrm.instructions[pc as usize] {
-	    Instruction::DupMinusSP(i) => {
-		data.push(data[(sp - (i + 3)) as usize]);
-		pc += 1;
-	    },
 	    Instruction::DupPlusSP(i) => {
 		data.push(data[(sp + i) as usize]);
+		pc += 1;
+	    },
+	    Instruction::MoveMinusSP(local_offset, sp_offset) => {
+		data[sp as usize + local_offset] = data[(sp - (sp_offset + 3)) as usize];
+		pc += 1;
+	    },
+	    Instruction::MovePlusSP(i) => {
+		let val = data.pop().unwrap();
+		let index = sp as usize + *i;
+		// Accounts for top-level locals
+		while index >= data.len() {
+		    data.push(0);
+		}
+		data[index] = val;
 		pc += 1;
 	    },
 	    Instruction::JumpIfZero(label) => {
 		let top = data.pop().unwrap();
 		if top != 0 {
-		    pc = pgrm.syms[label];
+		    pc = pgrm.syms[label].0;
 		}
 		pc += 1;
 	    },
 	    Instruction::Jump(label) => {
-		pc = pgrm.syms[label];
+		pc = pgrm.syms[label].0;
 	    },
 	    Instruction::Return => {
 		let ret = data.pop().unwrap();
@@ -193,9 +214,14 @@ pub fn eval(pgrm: Program) {
 
 		data.push(sp);
 		data.push(pc + 1);
-		pc = pgrm.syms[label];
+		pc = pgrm.syms[label].0;
+		let mut nlocals = pgrm.syms[label].1;
 		sp = data.len() as i32;
-	    }
+		while nlocals > 0 {
+		    data.push(0);
+		    nlocals -= 1;
+		}
+	    },
 	    Instruction::Add => {
 		let left = data.pop().unwrap();
 		let right = data.pop().unwrap();
