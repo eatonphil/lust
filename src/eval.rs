@@ -31,7 +31,7 @@ pub struct Program {
 
 fn compile_binary_operation(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     bop: BinaryOperation,
 ) {
@@ -59,7 +59,7 @@ fn compile_binary_operation(
 
 fn compile_function_call(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     fc: FunctionCall,
 ) {
@@ -74,7 +74,7 @@ fn compile_function_call(
 
 fn compile_literal(
     pgrm: &mut Program,
-    _: &Vec<char>,
+    _: &[char],
     locals: &mut HashMap<String, i32>,
     lit: Literal,
 ) {
@@ -92,7 +92,7 @@ fn compile_literal(
 
 fn compile_expression(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     exp: Expression,
 ) {
@@ -111,7 +111,7 @@ fn compile_expression(
 
 fn compile_declaration(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     _: &mut HashMap<String, i32>,
     fd: FunctionDeclaration,
 ) {
@@ -141,7 +141,7 @@ fn compile_declaration(
         fd.name.value,
         Symbol {
             location: function_index as i32,
-            narguments: narguments,
+            narguments,
             nlocals: new_locals.keys().len(),
         },
     );
@@ -158,7 +158,7 @@ fn compile_declaration(
 
 fn compile_return(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     ret: Return,
 ) {
@@ -166,7 +166,7 @@ fn compile_return(
     pgrm.instructions.push(Instruction::Return);
 }
 
-fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, if_: If) {
+fn compile_if(pgrm: &mut Program, raw: &[char], locals: &mut HashMap<String, i32>, if_: If) {
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!("if_else_{}", pgrm.instructions.len());
     pgrm.instructions
@@ -186,7 +186,7 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, 
 
 fn compile_local(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     local: Local,
 ) {
@@ -198,7 +198,7 @@ fn compile_local(
 
 fn compile_statement(
     pgrm: &mut Program,
-    raw: &Vec<char>,
+    raw: &[char],
     locals: &mut HashMap<String, i32>,
     stmt: Statement,
 ) {
@@ -211,7 +211,7 @@ fn compile_statement(
     }
 }
 
-pub fn compile(raw: &Vec<char>, ast: AST) -> Program {
+pub fn compile(raw: &[char], ast: Ast) -> Program {
     let mut locals: HashMap<String, i32> = HashMap::new();
     let mut pgrm = Program {
         syms: HashMap::new(),
@@ -288,7 +288,7 @@ pub fn eval(pgrm: Program) {
                         print!("{}", data.pop().unwrap());
                         print!(" ");
                     }
-                    println!("");
+                    println!();
                     pc += 1;
                     continue;
                 }

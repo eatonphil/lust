@@ -59,40 +59,36 @@ pub enum Statement {
     Local(Local),
 }
 
-pub type AST = Vec<Statement>;
+pub type Ast = Vec<Statement>;
 
-fn expect_keyword(tokens: &Vec<Token>, index: usize, value: &str) -> bool {
+fn expect_keyword(tokens: &[Token], index: usize, value: &str) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Keyword && t.value == value;
+    t.kind == TokenKind::Keyword && t.value == value
 }
 
-fn expect_syntax(tokens: &Vec<Token>, index: usize, value: &str) -> bool {
+fn expect_syntax(tokens: &[Token], index: usize, value: &str) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Syntax && t.value == value;
+    t.kind == TokenKind::Syntax && t.value == value
 }
 
-fn expect_identifier(tokens: &Vec<Token>, index: usize) -> bool {
+fn expect_identifier(tokens: &[Token], index: usize) -> bool {
     if index >= tokens.len() {
         return false;
     }
 
     let t = tokens[index].clone();
-    return t.kind == TokenKind::Identifier;
+    t.kind == TokenKind::Identifier
 }
 
-fn parse_expression(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Expression, usize)> {
+fn parse_expression(raw: &[char], tokens: &[Token], index: usize) -> Option<(Expression, usize)> {
     if index >= tokens.len() {
         return None;
     }
@@ -112,7 +108,7 @@ fn parse_expression(
         // Function call
         let mut arguments: Vec<Expression> = vec![];
         while !expect_syntax(tokens, next_index, ")") {
-            if arguments.len() > 0 {
+            if !arguments.is_empty() {
                 if !expect_syntax(tokens, next_index, ",") {
                     println!(
                         "{}",
@@ -127,8 +123,7 @@ fn parse_expression(
             }
 
             let res = parse_expression(raw, tokens, next_index);
-            if res.is_some() {
-                let (arg, next_next_index) = res.unwrap();
+            if let Some((arg, next_next_index)) = res {
                 next_index = next_next_index;
                 arguments.push(arg);
             } else {
@@ -147,7 +142,7 @@ fn parse_expression(
         return Some((
             Expression::FunctionCall(FunctionCall {
                 name: tokens[index].clone(),
-                arguments: arguments,
+                arguments,
             }),
             next_index,
         ));
@@ -198,11 +193,7 @@ fn parse_expression(
     ))
 }
 
-fn parse_function(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Statement, usize)> {
+fn parse_function(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "function") {
         return None;
     }
@@ -233,7 +224,7 @@ fn parse_function(
     next_index += 1; // Skip past open paren
     let mut parameters: Vec<Token> = vec![];
     while !expect_syntax(tokens, next_index, ")") {
-        if parameters.len() > 0 {
+        if !parameters.is_empty() {
             if !expect_syntax(tokens, next_index, ",") {
                 println!("{}", tokens[next_index].loc.debug(raw, "Expected comma or close parenthesis after parameter in function declaration:"));
                 return None;
@@ -251,8 +242,7 @@ fn parse_function(
     let mut statements: Vec<Statement> = vec![];
     while !expect_keyword(tokens, next_index, "end") {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -270,22 +260,22 @@ fn parse_function(
 
     Some((
         Statement::FunctionDeclaration(FunctionDeclaration {
-            name: name,
-            parameters: parameters,
+            name,
+            parameters,
             body: statements,
         }),
         next_index,
     ))
 }
 
-fn parse_return(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_return(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "return") {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past return
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -312,7 +302,7 @@ fn parse_return(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(S
     Some((Statement::Return(Return { expression: expr }), next_index))
 }
 
-fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_local(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "local") {
         return None;
     }
@@ -345,7 +335,7 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
     next_index += 1; // Skip past =
 
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -372,21 +362,21 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
 
     Some((
         Statement::Local(Local {
-            name: name,
+            name,
             expression: expr,
         }),
         next_index,
     ))
 }
 
-fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(Statement, usize)> {
+fn parse_if(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     if !expect_keyword(tokens, index, "if") {
         return None;
     }
 
     let mut next_index = index + 1; // Skip past if
     let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
+    if res.is_none() {
         println!(
             "{}",
             tokens[next_index]
@@ -408,8 +398,7 @@ fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(State
     let mut statements: Vec<Statement> = vec![];
     while !expect_keyword(tokens, next_index, "end") {
         let res = parse_statement(raw, tokens, next_index);
-        if res.is_some() {
-            let (stmt, next_next_index) = res.unwrap();
+        if let Some((stmt, next_next_index)) = res {
             next_index = next_next_index;
             statements.push(stmt);
         } else {
@@ -427,7 +416,7 @@ fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(State
 
     Some((
         Statement::If(If {
-            test: test,
+            test,
             body: statements,
         }),
         next_index,
@@ -435,17 +424,14 @@ fn parse_if(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(State
 }
 
 fn parse_expression_statement(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
+    raw: &[char],
+    tokens: &[Token],
     index: usize,
 ) -> Option<(Statement, usize)> {
     let mut next_index = index;
-    let res = parse_expression(raw, tokens, next_index);
-    if !res.is_some() {
-        return None;
-    }
+    let res = parse_expression(raw, tokens, next_index)?;
 
-    let (expr, next_next_index) = res.unwrap();
+    let (expr, next_next_index) = res;
     next_index = next_next_index;
     if !expect_syntax(tokens, next_index, ";") {
         println!(
@@ -462,11 +448,7 @@ fn parse_expression_statement(
     Some((Statement::Expression(expr), next_index))
 }
 
-fn parse_statement(
-    raw: &Vec<char>,
-    tokens: &Vec<Token>,
-    index: usize,
-) -> Option<(Statement, usize)> {
+fn parse_statement(raw: &[char], tokens: &[Token], index: usize) -> Option<(Statement, usize)> {
     let parsers = [
         parse_if,
         parse_expression_statement,
@@ -484,14 +466,13 @@ fn parse_statement(
     None
 }
 
-pub fn parse(raw: &Vec<char>, tokens: Vec<Token>) -> Result<AST, String> {
+pub fn parse(raw: &[char], tokens: Vec<Token>) -> Result<Ast, String> {
     let mut ast = vec![];
     let mut index = 0;
     let ntokens = tokens.len();
     while index < ntokens {
         let res = parse_statement(raw, &tokens, index);
-        if res.is_some() {
-            let (stmt, next_index) = res.unwrap();
+        if let Some((stmt, next_index)) = res {
             index = next_index;
             ast.push(stmt);
             continue;

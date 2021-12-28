@@ -22,7 +22,7 @@ impl Location {
         }
     }
 
-    pub fn debug<S: Into<String>>(&self, raw: &Vec<char>, msg: S) -> String {
+    pub fn debug<S: Into<String>>(&self, raw: &[char], msg: S) -> String {
         let mut line = 0;
         let mut line_str = String::new();
         // Find the whole line of original source
@@ -31,7 +31,7 @@ impl Location {
                 line += 1;
 
                 // Done discovering line in question
-                if line_str.len() > 0 {
+                if !line_str.is_empty() {
                     break;
                 }
 
@@ -64,7 +64,7 @@ pub struct Token {
     pub loc: Location,
 }
 
-fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_operator(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let operators = ["+", "-", "<"];
 
     for possible_syntax in operators {
@@ -86,7 +86,7 @@ fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locati
     None
 }
 
-fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_syntax(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = [";", "=", "(", ")", ","];
 
     for possible_syntax in syntax {
@@ -108,7 +108,7 @@ fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
     None
 }
 
-fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_keyword(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = ["function", "end", "if", "then", "local", "return"];
 
     let mut next_loc = initial_loc;
@@ -139,7 +139,7 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
         break;
     }
 
-    if value.len() == 0 {
+    if value.is_empty() {
         return None;
     }
 
@@ -154,7 +154,7 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 
     Some((
         Token {
-            value: value,
+            value,
             loc: initial_loc,
             kind: TokenKind::Keyword,
         },
@@ -162,7 +162,7 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
     ))
 }
 
-fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_identifier(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let mut ident = String::new();
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
@@ -173,7 +173,7 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
     }
 
     // First character must not be a digit
-    if ident.len() > 0 && !ident.chars().nth(0).unwrap().is_digit(10) {
+    if !ident.is_empty() && !ident.chars().next().unwrap().is_digit(10) {
         Some((
             Token {
                 value: ident,
@@ -187,7 +187,7 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
     }
 }
 
-fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+fn lex_number(raw: &[char], initial_loc: Location) -> Option<(Token, Location)> {
     let mut ident = String::new();
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
@@ -197,7 +197,7 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
         c = raw[next_loc.index];
     }
 
-    if ident.len() > 0 {
+    if !ident.is_empty() {
         Some((
             Token {
                 value: ident,
@@ -211,7 +211,7 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
     }
 }
 
-fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
+fn eat_whitespace(raw: &[char], initial_loc: Location) -> Location {
     let mut c = raw[initial_loc.index];
     let mut next_loc = initial_loc;
     while [' ', '\n', '\r', '\t'].contains(&c) {
@@ -225,7 +225,7 @@ fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
     next_loc
 }
 
-pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
+pub fn lex(s: &[char]) -> Result<Vec<Token>, String> {
     let mut loc = Location {
         col: 0,
         index: 0,
@@ -249,8 +249,7 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
 
         for lexer in lexers {
             let res = lexer(s, loc);
-            if res.is_some() {
-                let (t, next_loc) = res.unwrap();
+            if let Some((t, next_loc)) = res {
                 loc = next_loc;
                 tokens.push(t);
                 continue 'outer;

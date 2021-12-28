@@ -9,7 +9,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let contents = fs::read_to_string(&args[1]).expect("Could not read file");
 
-    let raw: Vec<char> = contents.to_string().chars().collect();
+    let raw: Vec<char> = contents.chars().collect();
 
     let tokens = match lex::lex(&raw) {
         Ok(tokens) => tokens,
