@@ -1,5 +1,5 @@
 #[derive(Copy, Clone, Debug)]
-struct Location {
+pub struct Location {
     col: i32,
     line: i32,
     index: usize,
@@ -14,7 +14,7 @@ impl Location {
 	}
     }
 
-    fn debug<S: Into<String>>(&self, raw: Vec<char>, msg: S) -> String {
+    pub fn debug<S: Into<String>>(&self, raw: Vec<char>, msg: S) -> String {
 	let mut line = 0;
 	let mut line_str = String::new();
 	// Find the whole line of original source
@@ -40,8 +40,8 @@ impl Location {
     }
 }
 
-#[derive(Debug)]
-enum TokenKind {
+#[derive(Debug, PartialEq, Eq)]
+pub enum TokenKind {
     Identifier,
     Syntax,
     Keyword,
@@ -49,10 +49,10 @@ enum TokenKind {
 }
 
 #[derive(Debug)]
-struct Token {
-    value: String,
-    kind: TokenKind,
-    loc: Location,
+pub struct Token {
+    pub value: String,
+    pub kind: TokenKind,
+    pub loc: Location,
 }
 
 fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
@@ -96,7 +96,7 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 	next_loc = initial_loc;
 	while c.is_alphanumeric() || c == '_' {
 	    let n = next_loc.index - initial_loc.index;
-	    if value[:n] != possible_syntax[:n] {
+	    if value[..n] != possible_syntax[..n] {
 		continue 'outer;
 	    }
 	}
@@ -165,19 +165,17 @@ fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
     next_loc
 }
 
-pub fn lex<S: Into<String>>(s: S) -> Result<Vec<Token>, String> {
+pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
     let mut loc = Location{col: 0, index: 0, line: 0};
-    let s_string = s.into();
-    let size = s_string.len();
-    let raw: Vec<char> = s_string.chars().collect();
+    let size = s.len();
     let mut tokens: Vec<Token> = vec![];
 
     let lexers = [lex_keyword, lex_number, lex_identifier, lex_syntax];
     'outer: while loc.index < size {
-	loc = eat_whitespace(&raw, loc);
+	loc = eat_whitespace(s, loc);
 
 	for lexer in lexers {
-	    let res = lexer(&raw, loc);
+	    let res = lexer(s, loc);
 	    if res.is_some() {
 		let (t, next_loc) = res.unwrap();
 		loc = next_loc;
@@ -186,7 +184,7 @@ pub fn lex<S: Into<String>>(s: S) -> Result<Vec<Token>, String> {
 	    }
 	}
 
-	return Err(loc.debug(raw, "Unrecognized character while lexing:"));
+	return Err(loc.debug(*s, "Unrecognized character while lexing:"));
     }
 
     Ok(tokens)

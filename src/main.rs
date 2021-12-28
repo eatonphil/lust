@@ -10,17 +10,19 @@ fn main() {
     let contents = fs::read_to_string(args[0])
         .expect("Could not read file");
 
-    let tokens = match lex(contents) {
+    let raw: Vec<char> = contents.to_string().chars().collect();
+
+    let tokens = match lex::lex(&raw) {
 	Ok(tokens) => tokens,
 	Err(msg) => panic!("{}", msg),
     };
 
-    let ast = match parse(contents, tokens) {
+    let ast = match parse::parse(&raw, tokens) {
 	Ok(ast) => ast,
 	Err(msg) => panic!("{}", msg),
-    }
+    };
 
-    let pgrm = compile(contents, ast);
+    let pgrm = eval::compile(&raw, ast);
 
-    eval(contents, ast);
+    eval::eval(pgrm);
 }
