@@ -1,6 +1,7 @@
 use crate::parse::*;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 enum Instruction {
     DupMinusSP(i32),
     DupPlusSP(i32),
@@ -14,6 +15,7 @@ enum Instruction {
     LessThan,
 }
 
+#[derive(Debug)]
 pub struct Program {
     syms: HashMap<String, i32>,
     instructions: Vec<Instruction>,
@@ -140,6 +142,7 @@ pub fn eval(pgrm: Program) {
     let mut data: Vec<i32> = vec![];
 
     while pc < pgrm.instructions.len() as i32 {
+	println!("DEBUG[{}]: {:#?}", pc, pgrm.instructions[pc as usize]);
 	match &pgrm.instructions[pc as usize] {
 	    Instruction::DupMinusSP(i) => data.push(data[(sp - i) as usize]),
 	    Instruction::DupPlusSP(i) => data.push(data[(sp + i) as usize]),

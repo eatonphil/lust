@@ -46,6 +46,7 @@ pub enum TokenKind {
     Syntax,
     Keyword,
     Number,
+    Operator,
 }
 
 #[derive(Debug, Clone)]
@@ -55,13 +56,29 @@ pub struct Token {
     pub loc: Location,
 }
 
+fn lex_operator(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
+    let operators = [
+    	"+",
+	"-",
+	"<",
+    ];
+
+    for possible_syntax in operators {
+	let c = raw[initial_loc.index];
+	let next_loc = initial_loc.increment(false);
+	// TODO: this won't work with multiple-character operators like >= or ==
+	if possible_syntax == c.to_string() {
+	    return Some((Token{ value: possible_syntax.to_string(), loc: initial_loc, kind: TokenKind::Operator }, next_loc));
+	}
+    }
+
+    None
+}
+
 fn lex_syntax(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location)> {
     let syntax = [
     	";",
 	"=",
-	"+",
-	"-",
-	"<",
 	"(",
 	")",
     ];
@@ -91,7 +108,6 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
     let mut next_loc = initial_loc;
     let mut value = String::new();
     'outer: for possible_syntax in syntax {
-	value = String::new();
 	let mut c = raw[initial_loc.index];
 	next_loc = initial_loc;
 	while c.is_alphanumeric() || c == '_' {
@@ -100,7 +116,8 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 	    c = raw[next_loc.index];
 
 	    let n = next_loc.index - initial_loc.index;
-	    if value[..n] != possible_syntax[..n] {
+	    if value != possible_syntax[..n] {
+		value = String::new();
 		continue 'outer;
 	    }
 	}
@@ -116,8 +133,8 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 
     // If the next character would be part of a valid identifier, then
     // this is not a keyword.
-    if next_loc.index < raw.len() - 2 {
-	let next_c = raw[next_loc.index+1];
+    if next_loc.index < raw.len() - 1 {
+	let next_c = raw[next_loc.index];
 	if next_c.is_alphanumeric() || next_c == '_' {
 	    return None;
 	}
@@ -131,8 +148,8 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
     while c.is_alphanumeric() || c == '_' {
-	next_loc = next_loc.increment(false);
 	ident.push_str(&c.to_string());
+	next_loc = next_loc.increment(false);
 	c = raw[next_loc.index];
     }
 
@@ -149,8 +166,8 @@ fn lex_number(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Location
     let mut next_loc = initial_loc;
     let mut c = raw[initial_loc.index];
     while c.is_digit(10) {
-	next_loc = next_loc.increment(false);
 	ident.push_str(&c.to_string());
+	next_loc = next_loc.increment(false);
 	c = raw[next_loc.index];
     }
 
@@ -181,7 +198,7 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
     let size = s.len();
     let mut tokens: Vec<Token> = vec![];
 
-    let lexers = [lex_keyword, lex_number, lex_identifier, lex_syntax];
+    let lexers = [lex_keyword, lex_identifier, lex_number, lex_syntax, lex_operator];
     'outer: while loc.index < size {
 	loc = eat_whitespace(s, loc);
 	if loc.index == size {

@@ -133,15 +133,12 @@ fn parse_expression(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Optio
 	return Some((Expression::FunctionCall(FunctionCall{name: tokens[index].clone(), arguments: arguments}), next_index))
     }
 
-    // Otherwise is a binary operation
-    if next_index >= tokens.len() {
-	let n = tokens[next_index].clone();
-	if n.kind != TokenKind::Syntax {
-	    println!("{}", n.loc.debug(raw, "Expected valid binary operation:"));
-	    return None;
-	}
+    // Might be a literal expression
+    if next_index >= tokens.len() || tokens[next_index].clone().kind != TokenKind::Operator {
+	return Some((left, next_index));
     }
 
+    // Otherwise is a binary operation
     let op = tokens[next_index].clone();
     next_index += 1; // Skip past op
 
@@ -195,6 +192,7 @@ fn parse_function(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<
 	}
 
 	parameters.push(tokens[next_index].clone());
+	next_index += 1; // Skip past param
     }
 
     next_index += 1; // Skip past close paren
@@ -260,6 +258,13 @@ fn parse_local(raw: &Vec<char>, tokens: &Vec<Token>, index: usize) -> Option<(St
     let name = tokens[next_index].clone();
     next_index += 1; // Skip past name
 
+    if !expect_syntax(tokens, next_index, "=") {
+	println!("{}", tokens[next_index].loc.debug(raw, "Expected = syntax after local name:"));
+	return None;
+    }
+
+    next_index += 1; // Skip past =
+
     let res = parse_expression(raw, tokens, next_index);
     if !res.is_some() {
 	println!("{}", tokens[next_index].loc.debug(raw, "Expected valid expression in local declaration:"));
@@ -322,7 +327,6 @@ fn parse_expression_statement(raw: &Vec<char>, tokens: &Vec<Token>, index: usize
     let mut next_index = index;
     let res = parse_expression(raw, tokens, next_index);
     if !res.is_some() {
-	println!("{}", tokens[next_index].loc.debug(raw, "Expected valid expression in statement:"));
 	return None;
     }
 
