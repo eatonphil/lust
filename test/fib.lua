@@ -8,4 +8,4 @@ function fib(n)
    return n1 + n2;
 end
 
-print(fib(10));
+print(fib(12));

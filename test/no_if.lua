@@ -4,4 +4,6 @@ if n < 0 then
 end
 
 n + 12;
-print(n);
+local n2 = 1 + n;
+local n3 = n2 + 14;
+print(n3);
