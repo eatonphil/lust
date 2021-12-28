@@ -17,6 +17,7 @@ fn main() {
 	Ok(tokens) => tokens,
 	Err(msg) => panic!("{}", msg),
     };
+    println!("{:#?}", tokens);
 
     println!("After lexing, before parsing");
     let ast = match parse::parse(&raw, tokens) {

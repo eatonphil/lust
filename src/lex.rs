@@ -110,6 +110,10 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 	break;
     }
 
+    if value.len() == 0 {
+	return None;
+    }
+
     // If the next character would be part of a valid identifier, then
     // this is not a keyword.
     if next_loc.index < raw.len() - 2 {
@@ -163,6 +167,9 @@ fn eat_whitespace(raw: &Vec<char>, initial_loc: Location) -> Location {
     let mut next_loc = initial_loc;
     while [' ', '\n', '\r', '\t'].contains(&c) {
 	next_loc = next_loc.increment(c == '\n');
+	if next_loc.index == raw.len() {
+	    break;
+	}
 	c = raw[next_loc.index];
     }
 
@@ -177,6 +184,9 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
     let lexers = [lex_keyword, lex_number, lex_identifier, lex_syntax];
     'outer: while loc.index < size {
 	loc = eat_whitespace(s, loc);
+	if loc.index == size {
+	    break;
+	}
 
 	for lexer in lexers {
 	    let res = lexer(s, loc);
