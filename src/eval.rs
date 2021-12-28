@@ -8,18 +8,18 @@ enum Instruction {
     Return,
     JumpIfZero(String),
     Jump(String),
-    Call(String),
+    Call(String, usize),
     Add,
     Subtract,
     LessThan,
 }
 
-struct Program {
+pub struct Program {
     syms: HashMap<String, i32>,
     instructions: Vec<Instruction>,
 }
 
-fn compile_binary_operation(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, bop: BinaryOperation) {
+fn compile_binary_operation(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, bop: BinaryOperation) {
     compile_expression(pgrm, raw, locals, *bop.left);
     compile_expression(pgrm, raw, locals, *bop.right);
     match bop.operator.value.as_str() {
@@ -33,23 +33,24 @@ fn compile_binary_operation(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<St
 	"<" => {
 	    pgrm.instructions.push(Instruction::LessThan);
 	},
-	_ => panic!("{}", bop.operator.loc.debug(*raw, "Unable to compile binary operation:")),
+	_ => panic!("{}", bop.operator.loc.debug(raw, "Unable to compile binary operation:")),
     }
 }
 
-fn compile_function_call(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, fc: FunctionCall) {
+fn compile_function_call(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, fc: FunctionCall) {
+    let len = fc.arguments.len();
     for arg in fc.arguments {
 	compile_expression(pgrm, raw, locals, arg);
     }
 
-    pgrm.instructions.push(Instruction::Call(fc.name.value));
+    pgrm.instructions.push(Instruction::Call(fc.name.value, len));
 }
 
-fn compile_literal(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, lit: Literal) {
+fn compile_literal(pgrm: &mut Program, _: &Vec<char>, locals: &mut HashMap<String, i32>, lit: Literal) {
     match lit {
 	Literal::Number(i) => {
-	    let int = i.value.parse::<i32>().unwrap();
-	    pgrm.instructions.push(Instruction::Store(int));
+	    let n = i.value.parse::<i32>().unwrap();
+	    pgrm.instructions.push(Instruction::Store(n));
 	},
 	Literal::Identifier(ident) => {
 	    pgrm.instructions.push(Instruction::DupPlusSP(locals[&ident.value]));
@@ -57,7 +58,7 @@ fn compile_literal(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32
     }
 }
 
-fn compile_expression(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, exp: Expression) {
+fn compile_expression(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, exp: Expression) {
     match exp {
 	Expression::BinaryOperation(bop) => {
 	    compile_binary_operation(pgrm, raw, locals, bop);
@@ -71,44 +72,45 @@ fn compile_expression(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, 
     }
 }
 
-fn compile_declaration(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, fd: FunctionDeclaration) {
+fn compile_declaration(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, fd: FunctionDeclaration) {
     // Jump to end of function to guard top-level
     let done_label = format!("function_done_{}", pgrm.instructions.len());
-    pgrm.instructions.push(Instruction::Jump(done_label));
+    pgrm.instructions.push(Instruction::Jump(done_label.clone()));
 
-    pgrm.syms[&fd.name.value] = pgrm.instructions.len() as i32;
+    pgrm.syms.insert(fd.name.value, pgrm.instructions.len() as i32);
     for (i, param) in fd.parameters.iter().enumerate() {
 	pgrm.instructions.push(Instruction::DupMinusSP(fd.parameters.len() as i32 - (i as i32 + 1)));
-	locals.insert(param.value, i as i32);
+	locals.insert(param.value.clone(), i as i32);
     }
 
     for stmt in fd.body {
 	compile_statement(pgrm, raw, locals, stmt);
     }
 
-    pgrm.syms[&done_label] = pgrm.instructions.len() as i32;
+    pgrm.syms.insert(done_label, pgrm.instructions.len() as i32);
 }
 
-fn compile_return(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, ret: Return) {
+fn compile_return(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, ret: Return) {
+    compile_expression(pgrm, raw, locals, ret.expression);
     pgrm.instructions.push(Instruction::Return);
 }
 
-fn compile_if(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, if_: If) {
+fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, if_: If) {
     compile_expression(pgrm, raw, locals, if_.test);
     let done_label = format!("if_else_{}", pgrm.instructions.len());
-    pgrm.instructions.push(Instruction::JumpIfZero(done_label));
+    pgrm.instructions.push(Instruction::JumpIfZero(done_label.clone()));
     for stmt in if_.body {
 	compile_statement(pgrm, raw, locals, stmt);
     }
-    pgrm.syms[&done_label] = pgrm.instructions.len() as i32;
+    pgrm.syms.insert(done_label, pgrm.instructions.len() as i32);
 }
 
-fn compile_local(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, local: Local) {
+fn compile_local(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, local: Local) {
     locals.insert(local.name.value, pgrm.instructions.len() as i32);
     compile_expression(pgrm, raw, locals, local.expression);
 }
 
-fn compile_statement(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i32>, stmt: Statement) {
+fn compile_statement(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, stmt: Statement) {
     match stmt {
 	Statement::FunctionDeclaration(fd) => compile_declaration(pgrm, raw, locals, fd),
 	Statement::Return(r) => compile_return(pgrm, raw, locals, r),
@@ -119,13 +121,13 @@ fn compile_statement(pgrm: &Program, raw: &Vec<char>, locals: &HashMap<String, i
 }
 
 pub fn compile(raw: &Vec<char>, ast: AST) -> Program {
-    let locals: HashMap<String, i32> = HashMap::new();
-    let pgrm = Program{
+    let mut locals: HashMap<String, i32> = HashMap::new();
+    let mut pgrm = Program{
 	syms: HashMap::new(),
 	instructions: Vec::new(),
     };
     for stmt in ast {
-	compile_statement(&pgrm, raw, &locals, stmt);
+	compile_statement(&mut pgrm, raw, &mut locals, stmt);
     }
 
     pgrm
@@ -154,7 +156,18 @@ pub fn eval(pgrm: Program) {
 	    Instruction::Jump(label) => {
 		pc = pgrm.syms[label];
 	    },
-	    Instruction::Call(label) => {
+	    Instruction::Call(label, narguments) => {
+		// Handle builtin functions
+		if label == "print" {
+		    for _ in 0..*narguments {
+			print!("{}", data.pop().unwrap());
+			print!(" ");
+		    }
+		    println!("");
+		    pc += 1;
+		    continue;
+		}
+
 		calls.push(sp);
 		pc = pgrm.syms[label];
 		sp = pc;
@@ -177,6 +190,10 @@ pub fn eval(pgrm: Program) {
 		data.push(if left < right { 1 } else { 0 });
 		pc += 1;
 	    },
+	    Instruction::Store(n) => {
+		data.push(*n);
+		pc += 1;
+	    }
 	}
     }
 }

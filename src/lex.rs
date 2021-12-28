@@ -14,12 +14,12 @@ impl Location {
 	}
     }
 
-    pub fn debug<S: Into<String>>(&self, raw: Vec<char>, msg: S) -> String {
+    pub fn debug<S: Into<String>>(&self, raw: &Vec<char>, msg: S) -> String {
 	let mut line = 0;
 	let mut line_str = String::new();
 	// Find the whole line of original source
 	for c in raw {
-	    if c == '\n' {
+	    if *c == '\n' {
 		line += 1;
 
 		// Done discovering line in question
@@ -40,7 +40,7 @@ impl Location {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TokenKind {
     Identifier,
     Syntax,
@@ -48,7 +48,7 @@ pub enum TokenKind {
     Number,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub value: String,
     pub kind: TokenKind,
@@ -95,6 +95,10 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 	let mut c = raw[initial_loc.index];
 	next_loc = initial_loc;
 	while c.is_alphanumeric() || c == '_' {
+	    value.push_str(&c.to_string());
+	    next_loc = next_loc.increment(false);
+	    c = raw[next_loc.index];
+
 	    let n = next_loc.index - initial_loc.index;
 	    if value[..n] != possible_syntax[..n] {
 		continue 'outer;
@@ -184,7 +188,7 @@ pub fn lex(s: &Vec<char>) -> Result<Vec<Token>, String> {
 	    }
 	}
 
-	return Err(loc.debug(*s, "Unrecognized character while lexing:"));
+	return Err(loc.debug(s, "Unrecognized character while lexing:"));
     }
 
     Ok(tokens)
