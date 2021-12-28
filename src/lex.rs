@@ -122,6 +122,12 @@ fn lex_keyword(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Locatio
 	    }
 	}
 
+	// Not a complete match
+	if value.len() < possible_syntax.len() {
+	    value = String::new();
+	    continue;
+	}
+
 	// If it got to this point it found a match, so exit early.
 	// We don't need a longest match.
 	break;

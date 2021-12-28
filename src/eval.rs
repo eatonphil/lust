@@ -140,21 +140,29 @@ pub fn eval(pgrm: Program) {
     let mut sp: i32 = 0;
     let mut calls: Vec<i32> = vec![];
     let mut data: Vec<i32> = vec![];
+    println!("{:#?}", pgrm.instructions);
 
     while pc < pgrm.instructions.len() as i32 {
-	println!("DEBUG[{}]: {:#?}", pc, pgrm.instructions[pc as usize]);
+	println!("DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n", pc, sp, pgrm.instructions[pc as usize], data);
 	match &pgrm.instructions[pc as usize] {
-	    Instruction::DupMinusSP(i) => data.push(data[(sp - i) as usize]),
-	    Instruction::DupPlusSP(i) => data.push(data[(sp + i) as usize]),
+	    Instruction::DupMinusSP(i) => {
+		data.push(data[(sp - (i + 1)) as usize]);
+		pc += 1;
+	    },
+	    Instruction::DupPlusSP(i) => {
+		data.push(data[(sp + i) as usize]);
+		pc += 1;
+	    },
 	    Instruction::Return => {
 		pc = calls.pop().unwrap();
-		sp = pc;
+		sp = data.len() as i32;
 	    },
 	    Instruction::JumpIfZero(label) => {
 		let top = data.pop().unwrap();
 		if top != 0 {
 		    pc = pgrm.syms[label];
 		}
+		pc += 1;
 	    },
 	    Instruction::Jump(label) => {
 		pc = pgrm.syms[label];
@@ -173,7 +181,7 @@ pub fn eval(pgrm: Program) {
 
 		calls.push(sp);
 		pc = pgrm.syms[label];
-		sp = pc;
+		sp = data.len() as i32;
 	    }
 	    Instruction::Add => {
 		let left = data.pop().unwrap();
@@ -184,13 +192,13 @@ pub fn eval(pgrm: Program) {
 	    Instruction::Subtract => {
 		let left = data.pop().unwrap();
 		let right = data.pop().unwrap();
-		data.push(left - right);
+		data.push(right - left);
 		pc += 1;
 	    },
 	    Instruction::LessThan => {
 		let left = data.pop().unwrap();
 		let right = data.pop().unwrap();
-		data.push(if left < right { 1 } else { 0 });
+		data.push(if right < left { 1 } else { 0 });
 		pc += 1;
 	    },
 	    Instruction::Store(n) => {
