@@ -108,7 +108,7 @@ fn compile_if(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, 
 }
 
 fn compile_local(pgrm: &mut Program, raw: &Vec<char>, locals: &mut HashMap<String, i32>, local: Local) {
-    locals.insert(local.name.value, pgrm.instructions.len() as i32);
+    locals.insert(local.name.value, locals.keys().len() as i32);
     compile_expression(pgrm, raw, locals, local.expression);
 }
 
@@ -138,24 +138,18 @@ pub fn compile(raw: &Vec<char>, ast: AST) -> Program {
 pub fn eval(pgrm: Program) {
     let mut pc: i32 = 0;
     let mut sp: i32 = 0;
-    let mut calls: Vec<i32> = vec![];
     let mut data: Vec<i32> = vec![];
-    println!("{:#?}", pgrm.instructions);
 
     while pc < pgrm.instructions.len() as i32 {
 	println!("DEBUG[pc: {}, sp: {}]: {:#?}\nData: {:#?}\n\n", pc, sp, pgrm.instructions[pc as usize], data);
 	match &pgrm.instructions[pc as usize] {
 	    Instruction::DupMinusSP(i) => {
-		data.push(data[(sp - (i + 1)) as usize]);
+		data.push(data[(sp - (i + 3)) as usize]);
 		pc += 1;
 	    },
 	    Instruction::DupPlusSP(i) => {
 		data.push(data[(sp + i) as usize]);
 		pc += 1;
-	    },
-	    Instruction::Return => {
-		pc = calls.pop().unwrap();
-		sp = data.len() as i32;
 	    },
 	    Instruction::JumpIfZero(label) => {
 		let top = data.pop().unwrap();
@@ -166,6 +160,24 @@ pub fn eval(pgrm: Program) {
 	    },
 	    Instruction::Jump(label) => {
 		pc = pgrm.syms[label];
+	    },
+	    Instruction::Return => {
+		let ret = data.pop().unwrap();
+		let mut nargs = 0;
+		while sp < data.len() as i32 {
+		    // Clean up the local stack
+		    nargs += 1;
+		    data.pop();
+		}
+		pc = data.pop().unwrap();
+		sp = data.pop().unwrap();
+
+		// Clean up arguments
+		while nargs > 0 {
+		    data.pop();
+		    nargs -= 1;
+		}
+		data.push(ret);
 	    },
 	    Instruction::Call(label, narguments) => {
 		// Handle builtin functions
@@ -179,7 +191,8 @@ pub fn eval(pgrm: Program) {
 		    continue;
 		}
 
-		calls.push(sp);
+		data.push(sp);
+		data.push(pc + 1);
 		pc = pgrm.syms[label];
 		sp = data.len() as i32;
 	    }
@@ -198,7 +211,7 @@ pub fn eval(pgrm: Program) {
 	    Instruction::LessThan => {
 		let left = data.pop().unwrap();
 		let right = data.pop().unwrap();
-		data.push(if right < left { 1 } else { 0 });
+		data.push(if left < right { 1 } else { 0 });
 		pc += 1;
 	    },
 	    Instruction::Store(n) => {
