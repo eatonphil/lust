@@ -129,7 +129,7 @@ fn lex_identifier(raw: &Vec<char>, initial_loc: Location) -> Option<(Token, Loca
     }
 
     // First character must not be a digit
-    if ident.len() > 0 && !ident[0].is_digit() {
+    if ident.len() > 0 && !ident.nth(0).is_digit() {
 	Some((Token{ value: ident, loc: initial_loc, kind: TokenKind::Identifier }, next_loc))
     } else {
 	None
