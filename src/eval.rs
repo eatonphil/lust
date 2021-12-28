@@ -124,14 +124,6 @@ fn compile_declaration(
 
     let function_index = pgrm.instructions.len() as i32;
     let narguments = fd.parameters.len();
-    pgrm.syms.insert(
-        fd.name.value.clone(),
-        Symbol {
-            location: function_index,
-            narguments: 0,
-            nlocals: 0,
-        },
-    );
     for (i, param) in fd.parameters.iter().enumerate() {
         pgrm.instructions.push(Instruction::MoveMinusSP(
             i,
