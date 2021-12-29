@@ -35,4 +35,4 @@ lua test/fib.lua  0.06s user 0.00s system 99% cpu 0.063 total
 
 ## More examples
 
-See the tests directory.
+See the test directory.
