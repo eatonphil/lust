@@ -4,9 +4,10 @@ This project implements a parser, compiler, and virtual machine
 evaluator for a minimal subset of Lua. It is written from scratch in
 Rust.
 
-See [Writing a minimal Lua implementation with a virtual machine from
-scratch in Rust ](https://notes.eatonphil.com/lua-in-rust.html) for a
-guided walkthrough of the code.
+See the companion blog post, [Writing a minimal Lua implementation
+with a virtual machine from scratch in Rust
+](https://notes.eatonphil.com/lua-in-rust.html), for a guided
+walkthrough of the code.
 
 ## Example
 
